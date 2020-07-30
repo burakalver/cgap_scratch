@@ -1,0 +1,12 @@
+data/report/
+*_table.tsv
+*json
+
+*.DS_Store
+*.python-version
+*.DS_Store
+~$*
+.~*#
+*~
+__pycache__/
+*.ipynb
