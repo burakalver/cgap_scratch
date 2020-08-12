@@ -231,14 +231,16 @@ def field_report(search_results, field, image_path=None):
     }
 
 
-def field_list_mapping_table(fname_mapping_table, fields=set()):
+
+def load_clean_mapping_table(fname_mapping_table):
     """
     Get field list from mapping table.
     If fields is provided, append any of those that are missing in mapping table at the end.
     """
     map_table = pd.read_csv(path.join(DATA_DIR, fname_mapping_table), "\t", header=5)
     map_table = map_table[map_table["do_import"] == "Y"]
-
+    map_table.sort_values(by="no",inplace=True)
+    
     addon3 = [".display_title"
               if pd.notna(x) else ""
               for x in map_table['links_to']]
@@ -248,9 +250,19 @@ def field_list_mapping_table(fname_mapping_table, fields=set()):
     addon1 = ["variant."
               if x == "variant" else ""
               for x in map_table["scope"]]
-    fields_mapping_table = ["".join(x) for x in zip(addon1, addon2,
-                                                    list(map_table["field_name"]), addon3)]
+    map_table["field_name"] = ["".join(x) for x in zip(addon1, addon2,
+                                                       list(map_table["field_name"]), addon3)]
+    map_table.set_index("field_name", inplace=True)
+    return(map_table)
 
+    
+def field_list_mapping_table(fname_mapping_table, fields=set()):
+    """
+    Get field list from mapping table.
+    If fields is provided, append any of those that are missing in mapping table at the end.
+    """
+    map_table = load_clean_mapping_table(fname_mapping_table)
+    fields_mapping_table = map_table.index
     for field in fields:
         if field not in fields_mapping_table:
             fields_mapping_table.append(field)
@@ -265,24 +277,9 @@ def dbxref_links(values_dict):
     """
     map_table_list = []
     for fname_mapping_table in [FNAME_MAPPING_TABLE_VARIANT, FNAME_MAPPING_TABLE_GENE]:
-        map_table = pd.read_csv(path.join(DATA_DIR, fname_mapping_table), "\t", header=5)
-        map_table = map_table[map_table["do_import"] == "Y"]
-
-        addon3 = [".display_title"
-                  if pd.notna(x) else ""
-                  for x in map_table['links_to']]
-        addon2 = [json.loads(x)["key"] + "."
-                  if pd.notna(x) else ""
-                  for x in map_table['sub_embedding_group']]
-        addon1 = ["variant."
-                  if x == "variant" else ""
-                  for x in map_table["scope"]]
-        map_table["field_name"] = ["".join(x) for x in zip(addon1, addon2,
-                                                           list(map_table["field_name"]), addon3)]
-        map_table_list.append(map_table)
+        map_table_list.append(load_clean_mapping_table(fname_mapping_table))
     map_table = pd.concat(map_table_list)
     map_table = map_table[pd.notnull(map_table["link"])]
-    map_table.set_index("field_name", inplace=True)
 
     links_dict = deepcopy(values_dict)
 
