@@ -5,7 +5,6 @@ Create a report for all variants found on cgap test.
 import json
 from os import path, makedirs
 from urllib.parse import urlencode
-from copy import deepcopy
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -38,7 +37,7 @@ def search_result(params):
 
 def load_variants(sample="NA12878"):
     '''
-    Search response for variants from file GAPFIZ482GFI for <sample>
+    Search response for variants from file GAPFI2VBKGM7 for <sample>
     should be in "DATA_DIR/variants_<sample>.json"
 
     If not, make it be.
@@ -51,7 +50,7 @@ def load_variants(sample="NA12878"):
             variants = json.load(file_variant)
     else:
         params = {"type": "VariantSample",
-                  "file" : "GAPFIZ482GFI"}
+                  "file" : "GAPFI2VBKGM7"}
         if sample != "all":
             params.update({"CALL_INFO" : '%s_sample' % sample})
         variants = search_result(params)
@@ -231,7 +230,6 @@ def field_report(search_results, field, image_path=None):
     }
 
 
-
 def load_clean_mapping_table(fname_mapping_table):
     """
     Load mapping table, sort by no, filter down to do_import=Y,
@@ -262,48 +260,11 @@ def field_list_mapping_table(fname_mapping_table, fields=set()):
     If fields is provided, append any of those that are missing in mapping table at the end.
     """
     map_table = load_clean_mapping_table(fname_mapping_table)
-    fields_mapping_table = map_table.index
+    fields_mapping_table = map_table.index.tolist()
     for field in fields:
         if field not in fields_mapping_table:
             fields_mapping_table.append(field)
     return fields_mapping_table
-
-
-def dbxref_links(values_dict):
-    """
-    values_dict[field] = [value1, value2]
-    Combine variant and gene mapping tables and subset to fields that have a link field.
-    if the field has a link value, return the link based on value
-    """
-    map_table_list = []
-    for fname_mapping_table in [FNAME_MAPPING_TABLE_VARIANT, FNAME_MAPPING_TABLE_GENE]:
-        map_table_list.append(load_clean_mapping_table(fname_mapping_table))
-    map_table = pd.concat(map_table_list)
-    map_table = map_table[pd.notnull(map_table["link"])]
-
-    links_dict = deepcopy(values_dict)
-
-    for field, values in values_dict.items():
-        if field in map_table.index:
-            link_base = map_table.loc[field]["link"]
-            links_dict[field] = [link_base.replace("<ID>", value) for value in values]
-        else:
-            links_dict[field] = ["" for values in values]
-
-    return links_dict
-
-
-def dbxref_links_demo():
-    """
-    testing dbxref_links
-    """
-    values_dict = {
-        "biogrid": ["xxx", "yyy"],
-        "marrvel": ["ttt"],
-        "none": ["sdf", "asdf", "asdaf"]
-    }
-    links_dict = dbxref_links(values_dict)
-    print(links_dict)
 
 
 def create_all_reports(search_results, fields):
@@ -332,16 +293,60 @@ def create_all_reports(search_results, fields):
             row["Stats"] = '<a href = "%s">link</a>' % image_path_relative
         row["field"] = field
         stats.append(row)
-        column_order = ["field", stat_res_with_value_field,
-                        "Number of Values",
-                        "Number of Unique Values",
-                        "Stats",
-                        "Example1",
-                        "Example2"]
+
+    column_order = ["field", stat_res_with_value_field,
+                    "Number of Values",
+                    "Number of Unique Values",
+                    "Stats",
+                    "Example1",
+                    "Example2"]
     stats_table = pd.DataFrame(stats, columns=column_order)
 
     html = stats_table.to_html(render_links=True, escape=False, index=False)
     with open(path.join(report_dir, 'table_%s.html' % item_type), 'w') as outf:
+        outf.write(html)
+
+
+def create_links_report(search_results):
+    """
+    Gather stats about every field on variant or genes provided in search_result.
+    Create an html.
+    """
+    def html_link_for_value(link_base, value):
+        link = link_base.replace("<ID>", value)
+        return '<a href="%s">%s</a>' % (link, value)
+
+    item_type = "variant" if "variant" in search_results[0].keys() else "gene"
+
+    if item_type == "variant":
+        fname_mapping_table = FNAME_MAPPING_TABLE_VARIANT
+    else:
+        fname_mapping_table = FNAME_MAPPING_TABLE_GENE
+
+    map_table = load_clean_mapping_table(fname_mapping_table)
+    map_table = map_table[pd.notnull(map_table["link"])]
+    fields = map_table.index
+
+    table_list = []
+
+    for field in fields:
+        link_base = map_table.loc[field]["link"]
+        examples = field_report(search_results, field, image_path=None)
+        link1 = [html_link_for_value(link_base, value) for value in examples["Example1"]]
+        link2 = [html_link_for_value(link_base, value) for value in examples["Example2"]]
+
+        row = {
+            "field": field,
+            "link1": "\n".join(link1),
+            "link2": "\n".join(link2)
+        }
+        table_list.append(row)
+
+    table = pd.DataFrame(table_list)
+    html = table.to_html(render_links=True, escape=False, index=False)
+
+    report_dir = path.join(DATA_DIR, "report")
+    with open(path.join(report_dir, 'table_%s_link.html' % item_type), 'w') as outf:
         outf.write(html)
 
 
@@ -381,6 +386,7 @@ def report_wrapper_variant():
 
     fields = field_list_mapping_table(FNAME_MAPPING_TABLE_VARIANT, fields)
     create_all_reports(variants, fields)
+    create_links_report(variants)
 
 
 def report_wrapper_gene():
@@ -392,10 +398,10 @@ def report_wrapper_gene():
 
     fields = field_list_mapping_table(FNAME_MAPPING_TABLE_GENE, fields)
     create_all_reports(genes, fields)
-
+    create_links_report(genes)
 
 if __name__ == '__main__':
 #    sex_check()
-#    report_wrapper_variant()
-#    report_wrapper_gene()
+    report_wrapper_variant()
+    report_wrapper_gene()
     VAL = 1
