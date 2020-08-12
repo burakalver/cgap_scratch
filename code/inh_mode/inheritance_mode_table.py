@@ -12,10 +12,12 @@ This module provides some examples for incfheritance_mode.
 
 from os import path
 import json
+from urllib.parse import urlencode
 
 import pandas as pd
 
 import inheritance_mode
+import base
 
 DATA_DIR = path.join(base.ROOT_DIR, "data")
 
@@ -99,7 +101,8 @@ def all_scenarios_table():
                                             "genotype_label_self", "inheritance_modes"])
     dataframe.to_csv(path.join(DATA_DIR, "all_scenarios_table.tsv"), sep="\t", index=False)
 
-def NA12879_table(for_excel=False):
+
+def NA12879_table():
     """
     call inheritance_mode for each variant in "<DATA_DIR>/variants_NA12879.json"
     and create a table for output of inheritance_mode, output as tsv:
@@ -121,6 +124,7 @@ def NA12879_table(for_excel=False):
 
     column_order = ["GT_mother", "GT_father", "GT_self", "chrom", "novoPP",
                     "AD_mother", "AD_father", "AD_self", "title",
+                    "DP", "GQ",
                     "GT_label_mother", "GT_label_father",
                     "GT_label_self", "inheritance_modes"]
 
@@ -145,7 +149,20 @@ def NA12879_table(for_excel=False):
             chrom = "autosome"
         output["chrom"] = chrom
         output["novoPP"] = variant.get("novoPP")
-        output["title"] = variant["variant"]["display_title"]
+
+        title = variant["variant"]["display_title"]
+        params = {
+            "type": "VariantSample",
+            "file": "GAPFIPZSZYEK",
+            "CALL_INFO": "NA12879_sample",
+            "variant.display_title": title
+        }
+        base_url = "http://fourfront-cgaptest.9wzadzju3p.us-east-1.elasticbeanstalk.com/search/"
+        link = "%s?%s" % (base_url, urlencode(params))
+        output["title"] = '=hyperlink("%s","%s")' % (link, title)
+        
+        output["DP"] = variant["DP"]
+        output["GQ"] = variant["GQ"]
         output["inheritance_modes"] = inh_mod_result["inheritance_modes"]
 
         rows.append(output)
@@ -154,12 +171,12 @@ def NA12879_table(for_excel=False):
     sort_by = ['chrom', 'GT_mother', 'GT_father', 'GT_self', 'novoPP']
     sort_ascending = [field != 'novoPP' for field in sort_by]
     dataframe.sort_values(by=sort_by, ascending=sort_ascending, inplace=True)
+    dataframe.index=range(len(dataframe.index))
+    
+    for field in ['GT_mother', 'GT_father', 'GT_self', 'AD_mother', 'AD_father', 'AD_self']:
+        dataframe[field] = "'" + dataframe[field]
 
-    if for_excel:
-        for field in ['GT_mother', 'GT_father', 'GT_self', 'AD_mother', 'AD_father', 'AD_self']:
-            dataframe[field] = "'" + dataframe[field]
-
-    dataframe.to_csv(path.join(DATA_DIR, "NA12879_genotype_table.tsv"), sep="\t", index=False)
+    dataframe.to_csv(path.join(DATA_DIR, "NA12879_genotype_table.tsv"), sep="\t")
 
 if __name__ == '__main__':
     all_scenarios_table()
