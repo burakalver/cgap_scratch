@@ -5,6 +5,7 @@ Create a report for all variants found on cgap test.
 import json
 from os import path, makedirs
 from urllib.parse import urlencode
+from copy import deepcopy
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -16,14 +17,16 @@ from my_utils.pd_utils import print_full
 import base
 
 DATA_DIR = path.join(base.ROOT_DIR, "data")
+FNAME_MAPPING_TABLE_VARIANT = "VCF Mapping Table - v0.4.8 variant table.tsv"
+FNAME_MAPPING_TABLE_GENE = "VCF Mapping Table - GeneTable v0.4.6.tsv"
 
 def search_result(params):
     '''
-    Assuming the <keyname> in the <keyfilename> is a valid admin key for cgaptest.
+    Assuming the <keyname> in the <keyfilename> is a valid admin key for cgapwolf.
     Perform a search based on params, e.g. {"type": "Gene"} and return result.
     '''
     keyfilename = path.expanduser("~") + '/keypairs.json'
-    keyname = "cgaptest"
+    keyname = "cgapwolf"
     with open(keyfilename) as keyfile:
         keys = json.load(keyfile)
         key = keys[keyname]
@@ -35,7 +38,7 @@ def search_result(params):
 
 def load_variants(sample="NA12878"):
     '''
-    Search response for variants from file GAPFIPZSZYEK for <sample>
+    Search response for variants from file GAPFIZ482GFI for <sample>
     should be in "DATA_DIR/variants_<sample>.json"
 
     If not, make it be.
@@ -48,7 +51,7 @@ def load_variants(sample="NA12878"):
             variants = json.load(file_variant)
     else:
         params = {"type": "VariantSample",
-                  "file" : "GAPFIPZSZYEK"}
+                  "file" : "GAPFIZ482GFI"}
         if sample != "all":
             params.update({"CALL_INFO" : '%s_sample' % sample})
         variants = search_result(params)
@@ -60,7 +63,7 @@ def load_variants(sample="NA12878"):
 
 def load_genes():
     '''
-    Search response for genes on cgaptest should be in"DATA_DIR/genes.json"
+    Search response for genes on cgapwolf should be in"DATA_DIR/genes.json"
     If not, make it be.
     and return response
     '''
@@ -228,14 +231,13 @@ def field_report(search_results, field, image_path=None):
     }
 
 
-def field_list_mapping_table(
-        fname_mapping_table="VCF Mapping Table - v0.4.7 variant table - stable.tsv", fields=set()):
+def field_list_mapping_table(fname_mapping_table, fields=set()):
     """
     Get field list from mapping table.
     If fields is provided, append any of those that are missing in mapping table at the end.
     """
     map_table = pd.read_csv(path.join(DATA_DIR, fname_mapping_table), "\t", header=5)
-    map_table = map_table[map_table["do_import"]=="Y"]
+    map_table = map_table[map_table["do_import"] == "Y"]
 
     addon3 = [".display_title"
               if pd.notna(x) else ""
@@ -253,6 +255,54 @@ def field_list_mapping_table(
         if field not in fields_mapping_table:
             fields_mapping_table.append(field)
     return fields_mapping_table
+
+
+def dbxref_links(values_dict):
+    """
+    values_dict[field] = [value1, value2]
+    Combine variant and gene mapping tables and subset to fields that have a link field.
+    if the field has a link value, return the link based on value
+    """
+    map_table_list = []
+    for fname_mapping_table in [FNAME_MAPPING_TABLE_VARIANT, FNAME_MAPPING_TABLE_GENE]:
+        map_table = pd.read_csv(path.join(DATA_DIR, fname_mapping_table), "\t", header=5)
+        map_table = map_table[map_table["do_import"] == "Y"]
+
+        addon3 = [".display_title"
+                  if pd.notna(x) else ""
+                  for x in map_table['links_to']]
+        addon2 = [json.loads(x)["key"] + "."
+                  if pd.notna(x) else ""
+                  for x in map_table['sub_embedding_group']]
+        addon1 = ["variant."
+                  if x == "variant" else ""
+                  for x in map_table["scope"]]
+        map_table["field_name"] = ["".join(x) for x in zip(addon1, addon2,
+                                                           list(map_table["field_name"]), addon3)]
+        map_table_list.append(map_table)
+    map_table = pd.concat(map_table_list)
+    map_table = map_table[pd.notnull(map_table["link"])]
+    map_table.set_index("field_name", inplace=True)
+
+    links_dict = deepcopy(values_dict)
+
+    for field, values in values_dict.items():
+        if field in map_table.index:
+            link_base = map_table.loc[field]["link"]
+            links_dict[field] = [link_base.replace("<ID>", value) for value in values]
+        else:
+            links_dict[field] = ["" for values in values]
+
+    return links_dict
+
+
+def dbxref_links_demo():
+    values_dict = {
+        "biogrid": ["xxx", "yyy"],
+        "marrvel": ["ttt"],
+        "none": ["sdf", "asdf", "asdaf"]
+    }
+    links_dict = dbxref_links(values_dict)
 
 
 def create_all_reports(search_results, fields):
@@ -328,9 +378,7 @@ def report_wrapper_variant():
     variants = load_variants(sample)
     fields = nested_keys.nested_keys(variants)
 
-    fname_mapping_table = "VCF Mapping Table - v0.4.7 variant table - stable.tsv"
-    fields = field_list_mapping_table(fname_mapping_table, fields)
-
+    fields = field_list_mapping_table(FNAME_MAPPING_TABLE_VARIANT, fields)
     create_all_reports(variants, fields)
 
 
@@ -341,12 +389,12 @@ def report_wrapper_gene():
     genes = load_genes()
     fields = nested_keys.nested_keys(genes)
 
-    fname_mapping_table = "VCF Mapping Table - GeneTable v0.4.5.tsv"
-    fields = field_list_mapping_table(fname_mapping_table, fields)
+    fields = field_list_mapping_table(FNAME_MAPPING_TABLE_GENE, fields)
     create_all_reports(genes, fields)
 
 
 if __name__ == '__main__':
 #    sex_check()
 #    report_wrapper_variant()
-    report_wrapper_gene()
+#    report_wrapper_gene()
+    VAL = 1
