@@ -329,17 +329,27 @@ def create_links_report(search_results):
 
     table_list = []
 
+    n_examples = 5
+    
     for field in fields:
         link_base = map_table.loc[field]["link"]
-        examples = field_report(search_results, field, image_path=None)
-        link1 = [html_link_for_value(link_base, value) for value in examples["Example1"]]
-        link2 = [html_link_for_value(link_base, value) for value in examples["Example2"]]
-
-        row = {
-            "field": field,
-            "link1": "\n".join(link1),
-            "link2": "\n".join(link2)
-        }
+        pervar_values = get_values_pervar(search_results, field)
+        examples = []
+        for val in pervar_values:
+            if len(val) == 0:
+                continue
+            examples.append(val)
+            if len(examples) >= n_examples:
+                break
+        links = []
+        for example in examples:
+            links.append([html_link_for_value(link_base, value) for value in example])
+        for i in range(len(links), n_examples):
+            links.append([])
+            
+        row = {"field": field}
+        for link_enum in enumerate(links):
+            row["link%d" % link_enum[0]] = "<br>".join(link_enum[1])
         table_list.append(row)
 
     table = pd.DataFrame(table_list)
