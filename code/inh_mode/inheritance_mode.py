@@ -2,42 +2,42 @@
 given family genotypes and other info from variant, calculate inheritance mode.
 """
 
+GENOTYPE_LABEL_DOT = "Missing"
+GENOTYPE_LABEL_00 = "Homozygus reference"
+GENOTYPE_LABEL_0M = "Heterozygous"
+GENOTYPE_LABEL_MM = "Homozygus alternate"
+GENOTYPE_LABEL_MN_KEYWORD = "multiallelic"
+GENOTYPE_LABEL_MN = "Heterozygous alt/alt -  %s" % GENOTYPE_LABEL_MN_KEYWORD
+GENOTYPE_LABEL_MN_ADDON = " (%s in family)" % GENOTYPE_LABEL_MN_KEYWORD
+GENOTYPE_LABEL_0 = "Hemizygous reference"
+GENOTYPE_LABEL_M = "Hemizygous alternate"
+GENOTYPE_LABEL_FEMALE_CHRY = "-"
+GENOTYPE_LABEL_SEX_INCONSISTENT = "False"
+
 # GENOTYPE_LABEL_DOT = "missing"
-# GENOTYPE_LABEL_00 = "homozygus reference"
-# GENOTYPE_LABEL_0M = "heterozygous"
-# GENOTYPE_LABEL_MM = "homozygus alternate"
+# GENOTYPE_LABEL_00 = "homo ref"
+# GENOTYPE_LABEL_0M = "het"
+# GENOTYPE_LABEL_MM = "homo alt"
 # GENOTYPE_LABEL_MN_KEYWORD = "multiallelic"
 # GENOTYPE_LABEL_MN = "het alt/alt -  %s" % GENOTYPE_LABEL_MN_KEYWORD
 # GENOTYPE_LABEL_MN_ADDON = " (%s in family)" % GENOTYPE_LABEL_MN_KEYWORD
-# GENOTYPE_LABEL_0 = "hemizygous reference"
-# GENOTYPE_LABEL_M = "hemizygous alternate"
+# GENOTYPE_LABEL_0 = "hemi ref"
+# GENOTYPE_LABEL_M = "hemi alt"
 # GENOTYPE_LABEL_FEMALE_CHRY = "-"
 # GENOTYPE_LABEL_SEX_INCONSISTENT = "false"
-
-GENOTYPE_LABEL_DOT = "missing"
-GENOTYPE_LABEL_00 = "homo ref"
-GENOTYPE_LABEL_0M = "het"
-GENOTYPE_LABEL_MM = "homo alt"
-GENOTYPE_LABEL_MN_KEYWORD = "multiallelic"
-GENOTYPE_LABEL_MN = "het alt/alt -  %s" % GENOTYPE_LABEL_MN_KEYWORD
-GENOTYPE_LABEL_MN_ADDON = " (%s in family)" % GENOTYPE_LABEL_MN_KEYWORD
-GENOTYPE_LABEL_0 = "hemi ref"
-GENOTYPE_LABEL_M = "hemi alt"
-GENOTYPE_LABEL_FEMALE_CHRY = "-"
-GENOTYPE_LABEL_SEX_INCONSISTENT = "false"
 
 INHMODE_LABEL_DE_NOVO_STRONG = "de novo (strong)"
 INHMODE_LABEL_DE_NOVO_MEDIUM = "de novo (medium)"
 INHMODE_LABEL_DE_NOVO_WEAK = "de novo (weak)"
 INHMODE_LABEL_DE_NOVO_CHRXY = "de novo (chrXY)"
-INHMODE_DOMINANT_FATHER = "dominant (paternal)"
-INHMODE_DOMINANT_MOTHER = "dominant (maternal)"
-INHMODE_LABEL_RECESSIVE = "recessive"
+INHMODE_DOMINANT_FATHER = "Dominant (paternal)"
+INHMODE_DOMINANT_MOTHER = "Dominant (maternal)"
+INHMODE_LABEL_RECESSIVE = "Recessive"
 INHMODE_LABEL_X_LINKED_RECESSIVE_MOTHER = "X-linked recessive (Maternal)"
 INHMODE_LABEL_X_LINKED_DOMINANT_MOTHER = "X-linked dominant (Maternal)"
 INHMODE_LABEL_X_LINKED_DOMINANT_FATHER = "X-linked dominant (Paternal)"
 INHMODE_LABEL_Y_LINKED = "Y-linked dominant"
-INHMODE_LABEL_LOH = "Loss of Heteozyogousity"
+INHMODE_LABEL_LOH = "Loss of heteozyogousity"
 
 INHMODE_LABEL_NONE_DOT = "Low relevance, missing call(s) in family"
 INHMODE_LABEL_NONE_MN = "Low relevance, multiallelic site family"
@@ -170,7 +170,7 @@ def inheritance_modes_trio(genotype, genotype_label, sex, chrom, novoPP):
 
     if (genotype["mother"] == "0/1" and genotype["father"] == "0/1"
             and genotype["self"] == "1/1"):
-        return ["recessive"]
+        return [INHMODE_LABEL_RECESSIVE]
 
     if (genotype["mother"] == "0/1" and genotype["father"] == "0/0"
             and genotype["self"] == "1/1" and sex["self"] == "male" and chrom == "chrX"):
