@@ -65,6 +65,7 @@ def get_field_by_nested_key(parent0, keystr):
 
 def get_field_by_nested_key_routine(parent, keys, values):
     '''function to be called recursively for get_field_by_nested_key '''
+    
     if len(keys) == 0:
         return
     if isinstance(parent, list):
@@ -74,8 +75,13 @@ def get_field_by_nested_key_routine(parent, keys, values):
         remainingkeys = keys.copy()
         curkey = remainingkeys.pop(0)
         val = parent.get(curkey, None)
-        if isinstance(val, (list, dict)):
+        if isinstance(val, dict):
             get_field_by_nested_key_routine(val, remainingkeys, values)
+        elif isinstance(val, list):
+            if (not isinstance(val[0], (list, dict))) and len(remainingkeys)==0:
+                values.extend(val)
+            else:
+                get_field_by_nested_key_routine(val, remainingkeys, values)
         else:
             if val is not None:
                 values.append(val)
