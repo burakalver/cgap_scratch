@@ -43,10 +43,10 @@ def compare_df(df1, df2):
 
             
 if __name__ == '__main__':
-#    fname_old = path.join(DATA_DIR, 'VCF Mapping Table - v0.4.7 variant table - stable.tsv')
-#    fname_new = path.join(DATA_DIR, 'VCF Mapping Table - v0.4.8 variant table.tsv')
-    fname_old = path.join(DATA_DIR, 'VCF Mapping Table - GeneTable v0.4.5 - stable.tsv')
-    fname_new = path.join(DATA_DIR, 'VCF Mapping Table - GeneTable v0.4.6.tsv')
+    fname_old = path.join(DATA_DIR, 'VCF Mapping Table - v0.4.8 variant table.tsv.bak')
+    fname_new = path.join(DATA_DIR, 'VCF Mapping Table - v0.4.8 variant table.tsv')
+#    fname_old = path.join(DATA_DIR, 'VCF Mapping Table - GeneTable v0.4.6.tsv.bak')
+#    fname_new = path.join(DATA_DIR, 'VCF Mapping Table - GeneTable v0.4.6.tsv')
 
     KEY_FIELD = "field_name"
 
