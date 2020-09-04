@@ -3,41 +3,47 @@ Create a report for all variants found on cgap test.
 """
 
 import json
-from os import path, makedirs
+from os import path, makedirs, remove
 from urllib.parse import urlencode
+import re
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from dcicutils import ff_utils
+from dcicutils import ff_utils, diff_utils 
 from my_utils import nested_keys
+from my_utils.Rutils import unique
 from my_utils.pd_utils import print_full
 import base
+
 
 DATA_DIR = path.join(base.ROOT_DIR, "data")
 FNAME_MAPPING_TABLE_VARIANT = "VCF Mapping Table - v0.4.8 variant table.tsv"
 FNAME_MAPPING_TABLE_GENE = "VCF Mapping Table - GeneTable v0.4.6.tsv"
 
+KEYNAME = "cgaptest"
+VCF_FILE = "GAPFI2VBKGM7"
+
+
 def search_result(params):
     '''
-    Assuming the <keyname> in the <keyfilename> is a valid admin key for cgapwolf.
+    Assuming the <KEYNAME> in the <keyfilename> is a valid admin key for cgapwolf.
     Perform a search based on params, e.g. {"type": "Gene"} and return result.
     '''
     keyfilename = path.expanduser("~") + '/keypairs.json'
-    keyname = "cgapwolf"
     with open(keyfilename) as keyfile:
         keys = json.load(keyfile)
-        key = keys[keyname]
+        key = keys[KEYNAME]
     base_url = "/search/"
     query = "%s?%s" % (base_url, urlencode(params))
     result = ff_utils.search_metadata(query, key=key)
     return result
 
 
-def load_variants(sample="NA12878"):
+def load_variants(sample="NA12879"):
     '''
-    Search response for variants from file GAPFI2VBKGM7 for <sample>
+    Search response for variants from VCF_FILE for <sample>
     should be in "DATA_DIR/variants_<sample>.json"
 
     If not, make it be.
@@ -50,7 +56,7 @@ def load_variants(sample="NA12878"):
             variants = json.load(file_variant)
     else:
         params = {"type": "VariantSample",
-                  "file" : "GAPFI2VBKGM7"}
+                  "file" : VCF_FILE}
         if sample != "all":
             params.update({"CALL_INFO" : '%s_sample' % sample})
         variants = search_result(params)
@@ -73,7 +79,7 @@ def load_genes():
     else:
         genes = search_result(params={"type": "Gene"})
         with open(filename_gene, "w") as file_gene:
-            json.dump(genes, file_gene)
+            json.dump(genes, file_gene,indent=4)
 
     return genes
 
@@ -230,15 +236,20 @@ def field_report(search_results, field, image_path=None):
     }
 
 
-def load_clean_mapping_table(fname_mapping_table):
+def load_clean_mapping_table(fname_mapping_table, do_import_Y_only = True):
     """
     Load mapping table, sort by no, filter down to do_import=Y,
     Add field_name, and set it as index.
     """
     map_table = pd.read_csv(path.join(DATA_DIR, fname_mapping_table), "\t", header=5)
-    map_table = map_table[map_table["do_import"] == "Y"]
+    if do_import_Y_only:
+        map_table = map_table[map_table["do_import"] == "Y"]
     map_table.sort_values(by="no", inplace=True)
 
+    ## display_titles can appear twice, once because of link_to, once because they are already there.
+    ## mark them for removal.
+    map_table = map_table[~map_table["field_name"].str.endswith(".display_title")]
+    
     addon3 = [".display_title"
               if pd.notna(x) else ""
               for x in map_table['links_to']]
@@ -250,6 +261,7 @@ def load_clean_mapping_table(fname_mapping_table):
               for x in map_table["scope"]]
     map_table["field_name"] = ["".join(x) for x in zip(addon1, addon2,
                                                        list(map_table["field_name"]), addon3)]
+
     map_table.set_index("field_name", inplace=True)
     return map_table
 
@@ -283,6 +295,7 @@ def create_all_reports(search_results, fields):
 
     stats = []
     for field in fields:
+        print(field)
         image_path_relative = path.join(image_dir, "summary.%s.%s.png" % (item_type, field))
         image_path_absolute = path.join(report_dir, image_path_relative)
         if path.exists(image_path_absolute):
@@ -307,9 +320,45 @@ def create_all_reports(search_results, fields):
         outf.write(html)
 
 
+def delete_images_for_changed_fields(filename_old, filename_new, do_delete = False):
+    differ = diff_utils.DiffManager()
+
+    with open(filename_old) as file_variant:
+        old = json.load(file_variant)
+
+    with open(filename_new) as file_variant:
+        new = json.load(file_variant)
+
+    item_type = "variant" if "variant" in filename_new else "gene"
+    print("comparing %s, %d from %s to %d from %s" % (item_type, len(old), filename_old, len(new), filename_new))
+    comparison = differ.comparison(old, new)
+    intermediate = unique([re.sub("\[(.*?)\]","",each_diff) for each_diff in comparison])
+    intermediate = unique([re.sub(" :.*$","",each_diff) for each_diff in intermediate])
+    fields = [re.sub("^.","",each_diff) for each_diff in intermediate]
+
+    report_dir = path.join(DATA_DIR, "report")
+    image_dir = "images"
+
+    image_dir_absolute = path.join(report_dir, image_dir)
+    makedirs(image_dir_absolute, exist_ok=True)
+
+
+    for field in fields:
+        image_path_relative = path.join(image_dir, "summary.%s.%s.png" % (item_type, field))
+        image_path_absolute = path.join(report_dir, image_path_relative)
+        if path.exists(image_path_absolute):
+            if do_delete:
+                print("deleting %s" % image_path_absolute)
+                remove(image_path_absolute)
+            else:
+                print("will delete %s, if you rerun with do_delete=T" % image_path_absolute)
+        else:
+            print("the image file is already absent: %s" % image_path_absolute)
+
+
 def create_links_report(search_results):
     """
-    Gather stats about every field on variant or genes provided in search_result.
+    Gather links for fields with links.
     Create an html.
     """
     def html_link_for_value(link_base, value):
@@ -358,6 +407,36 @@ def create_links_report(search_results):
     report_dir = path.join(DATA_DIR, "report")
     with open(path.join(report_dir, 'table_%s_link.html' % item_type), 'w') as outf:
         outf.write(html)
+
+
+def identify_fields_with_no_values():
+    """
+    For every field in mapping table, check which ones have no values at the moment.
+    output an updated do_import column with Not_yet values for missing fields.
+    """
+
+    for item_type in ["variant","gene"]:
+        if item_type == "variant":
+            sample = "NA12879"
+            search_results = load_variants(sample)
+            fname_mapping_table = FNAME_MAPPING_TABLE_VARIANT
+        else:
+            search_results = load_genes()
+            fname_mapping_table = FNAME_MAPPING_TABLE_GENE
+
+        map_table = load_clean_mapping_table(fname_mapping_table, do_import_Y_only=False)
+        map_table = map_table["do_import"]
+        for field in map_table.index:
+            print(map_table.loc[field])
+            if (map_table.loc[field]) != "Y":
+                continue
+            values = get_values_all(search_results, field)
+            if(len(values)==0):
+                map_table.loc[field] = "Not_yet"
+
+        fname_csv = path.join(DATA_DIR, "do_import_%s.csv" % item_type)
+        print("writing %s" % fname_csv)
+        map_table.to_csv(fname_csv)
 
 
 def sex_check():
@@ -410,8 +489,22 @@ def report_wrapper_gene():
     create_all_reports(genes, fields)
     create_links_report(genes)
 
+
+def delete_images_wrapper(do_delete=False):
+    sample="NA12879"
+    filename_old = path.join(DATA_DIR, "variants_%s.json.bak" % sample)
+    filename_new = path.join(DATA_DIR, "variants_%s.json" % sample)
+    delete_images_for_changed_fields(filename_old, filename_new, do_delete)
+        
+    filename_old = path.join(DATA_DIR, "genes.json.bak")
+    filename_new = path.join(DATA_DIR, "genes.json")
+    delete_images_for_changed_fields(filename_old, filename_new, do_delete)
+
+
 if __name__ == '__main__':
 #    sex_check()
+    VAL = 1
+    delete_images_wrapper(False)
     report_wrapper_variant()
     report_wrapper_gene()
-    VAL = 1
+    identify_fields_with_no_values()

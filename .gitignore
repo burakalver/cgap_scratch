@@ -10,3 +10,5 @@ data/report/
 *~
 __pycache__/
 *.ipynb
+data/*.bak
+data/do_import*
